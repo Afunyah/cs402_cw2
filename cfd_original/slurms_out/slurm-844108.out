@@ -1,0 +1,4 @@
+Loading cs402-mpi
+  Loading requirement: gcc9
+./save2ppm: line 15: ppm/karman_%j.ppm: No such file or directory
+Saved as karman_%j.ppm

@@ -1,37 +1,43 @@
-CC=gcc
+BUILDDIR := build
+SRCDIR := src
+EXECT := $(BUILDDIR)/bin
+
+CC=mpicc
 CFLAGS=-O3 -Wall -g -pg 
 
-.c.o:
-	$(CC) -c $(CFLAGS) $<
+$(shell mkdir -p $(EXECT))
 
-all: bin2ppm diffbin pingpong colcopy karman # karman-par
+
+all: bin2ppm diffbin pingpong colcopy karman
 
 clean:
-	rm -f bin2ppm diffbin pingpong colcopy karman karman-par *.o
+	rm -rf $(BUILDDIR)
 
-karman: alloc.o boundary.o init.o karman.o simulation.o
-	$(CC) $(CFLAGS) -o $@ $^ -lm
+karman: $(BUILDDIR)/alloc.o $(BUILDDIR)/boundary.o $(BUILDDIR)/init.o $(BUILDDIR)/karman.o $(BUILDDIR)/simulation.o
+	$(CC) $(CFLAGS) -o $(EXECT)/$@ $^ -lm
 
-karman-par: alloc.o boundary.o init.o karman-par.o simulation-par.o
-	$(CC) $(CFLAGS) -o $@ $^ -lm
+karman-par: $(BUILDDIR)/alloc.o $(BUILDDIR)/boundary.o $(BUILDDIR)/init.o $(BUILDDIR)/karman-par.o $(BUILDDIR)/simulation.o
+	$(CC) $(CFLAGS) -o $(EXECT)/$@ $^ -lm
 
-bin2ppm: bin2ppm.o alloc.o
-	$(CC) $(CFLAGS) -o $@ $^ -lm
+bin2ppm: $(BUILDDIR)/bin2ppm.o $(BUILDDIR)/alloc.o
+	$(CC) $(CFLAGS) -o $(EXECT)/$@ $^ -lm
 
-diffbin: diffbin.c
-	$(CC) $(CFLAGS) -o $@ $^ -lm
+diffbin: $(SRCDIR)/diffbin.c
+	$(CC) $(CFLAGS) -o $(EXECT)/$@ $^ -lm
 
-pingpong: pingpong.o
-	$(CC) $(CFLAGS) -o $@ $^
+pingpong: $(BUILDDIR)/pingpong.o
+	$(CC) $(CFLAGS) -o $(EXECT)/$@ $^
 
-colcopy: colcopy.o alloc.o
-	$(CC) $(CFLAGS) -o $@ $^
+colcopy: $(BUILDDIR)/colcopy.o $(BUILDDIR)/alloc.o
+	$(CC) $(CFLAGS) -o $(EXECT)/$@ $^
 
-bin2ppm.o        : alloc.h datadef.h
-boundary.o       : datadef.h
-colcopy.o        : alloc.h
-init.o           : datadef.h
-karman.o         : alloc.h boundary.h datadef.h init.h simulation.h
-karman-par.o     : alloc.h boundary.h datadef.h init.h simulation.h
-simulation.o     : datadef.h init.h
-simulation-par.o : datadef.h init.h
+
+$(BUILDDIR)/%.o : $(SRCDIR)/%.c
+	@echo compiling $<
+	$(maketargetdir)
+	$(CC) $(CFLAGS) -o $@ -c $<
+
+define maketargetdir
+	-@mkdir -p $(dir $@) > /dev/null 2>&1
+endef
+
