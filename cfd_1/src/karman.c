@@ -173,32 +173,32 @@ int main(int argc, char *argv[])
     }
 
     /* Main loop */
-    for (t = 0.0; t < t_end; t += del_t, iters++) {
-        set_timestep_interval(&del_t, imax, jmax, delx, dely, u, v, Re, tau);
+    // for (t = 0.0; t < t_end; t += del_t, iters++) {
+    //     set_timestep_interval(&del_t, imax, jmax, delx, dely, u, v, Re, tau);
 
-        ifluid = (imax * jmax) - ibound;
+    //     ifluid = (imax * jmax) - ibound;
 
-        compute_tentative_velocity(u, v, f, g, flag, imax, jmax,
-            del_t, delx, dely, gamma, Re);
+    //     compute_tentative_velocity(u, v, f, g, flag, imax, jmax,
+    //         del_t, delx, dely, gamma, Re);
 
-        compute_rhs(f, g, rhs, flag, imax, jmax, del_t, delx, dely);
+    //     compute_rhs(f, g, rhs, flag, imax, jmax, del_t, delx, dely);
 
-        if (ifluid > 0) {
-            itersor = poisson(p, rhs, flag, imax, jmax, delx, dely,
-                        eps, itermax, omega, &res, ifluid);
-        } else {
-            itersor = 0;
-        }
+    //     if (ifluid > 0) {
+    //         itersor = poisson(p, rhs, flag, imax, jmax, delx, dely,
+    //                     eps, itermax, omega, &res, ifluid);
+    //     } else {
+    //         itersor = 0;
+    //     }
 
-        if (proc == 0 && verbose > 1) {
-            printf("%d t:%g, del_t:%g, SOR iters:%3d, res:%e, bcells:%d\n",
-                iters, t+del_t, del_t, itersor, res, ibound);
-        }
+    //     if (proc == 0 && verbose > 1) {
+    //         printf("%d t:%g, del_t:%g, SOR iters:%3d, res:%e, bcells:%d\n",
+    //             iters, t+del_t, del_t, itersor, res, ibound);
+    //     }
 
-        update_velocity(u, v, f, g, p, flag, imax, jmax, del_t, delx, dely);
+    //     update_velocity(u, v, f, g, p, flag, imax, jmax, del_t, delx, dely);
 
-        apply_boundary_conditions(u, v, flag, imax, jmax, ui, vi);
-    } /* End of main loop */
+    //     apply_boundary_conditions(u, v, flag, imax, jmax, ui, vi);
+    // } /* End of main loop */
   
     if (outfile != NULL && strcmp(outfile, "") != 0 && proc == 0) {
         write_bin(u, v, p, flag, imax, jmax, xlength, ylength, outfile);
