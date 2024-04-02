@@ -145,27 +145,35 @@ int main(int argc, char *argv[])
     int n_nodes; // Total number of processes
     int tag;     // Message tag
 
-    MPI_Status status; // Status of the received message
     /* Initialize MPI */
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &n_nodes);
 
+    printf("Hello world, from process %d of %d\n", rank, n_nodes);
+
     delx = xlength / imax;
     dely = ylength / jmax;
-
-    int i_width_arr[n_nodes]; // Workload per node
+    int imax_node = 0;
+    int i_width_arr[n_nodes];     // Workload per node
     int i_width_arr_exp[n_nodes]; // Expanded for boundaries
+
+    memset(i_width_arr, 0, n_nodes * sizeof(int));
+    memset(i_width_arr_exp, 0, n_nodes * sizeof(int));
+
+    // int i_width_arr[] = {331,331};     // Workload per node
+    // int i_width_arr_exp[] = {333,333}; // Expanded for boundaries
+
     if (rank == 0)
     {
         // Perform this calculation once in root node
         int m = 0;
-        // Tally system to account for uneven number of nodes, where the problem size is not equally divided
-        for (int k = 0; k < imax; k++)
+        // Tally to account for uneven number of nodes, where the problem size is not equally divided
+        for (int k = 1; k <= imax; k++)
         {
             if (m == n_nodes)
             {
-                break;
+                m = 0;
             }
             i_width_arr[m] += 1;
             m += 1;
@@ -176,10 +184,19 @@ int main(int argc, char *argv[])
         {
             i_width_arr_exp[k] = i_width_arr[k] + 2;
         }
-    }
 
-    int imax_node;
+        // for (int k = 0; k < sizeof(i_width_arr) / sizeof(int);k++){
+        //     printf("i_width_arr %d = %d\n", k , i_width_arr[k]);
+        // }
+
+        // MPI_Scatter(i_width_arr, 1, MPI_INT, &imax_node, 1, MPI_INT, 0, MPI_COMM_WORLD); // Send imax of each node
+    }
+    // else{
+    //     MPI_Scatter(NULL, 1, MPI_INT, &imax_node, 1, MPI_INT, 0, MPI_COMM_WORLD); // Send imax of each node
+    // }
+
     MPI_Scatter(i_width_arr, 1, MPI_INT, &imax_node, 1, MPI_INT, 0, MPI_COMM_WORLD); // Send imax of each node
+    printf("imax node =  %d\n", imax_node);
 
     int i_start = rank * imax_node; // Offset from 0, in terms of i
 
@@ -205,14 +222,71 @@ int main(int argc, char *argv[])
 
     if (!u || !v || !f || !g || !p || !rhs || !flag)
     {
+        fprintf(stderr, "Rank %d\n", rank);
         fprintf(stderr, "Couldn't allocate memory for matrices.\n");
+
         return 1;
     }
 
     float **u_full, **v_full, **p_full;
     char **flag_full;
+    // if (rank == 0)
+    // {
+    //     /* Allocate arrays for full grid */
+    //     u_full = alloc_floatmatrix(imax + 2, jmax + 2);
+    //     v_full = alloc_floatmatrix(imax + 2, jmax + 2);
+    //     p_full = alloc_floatmatrix(imax + 2, jmax + 2);
+    //     flag_full = alloc_charmatrix(imax + 2, jmax + 2);
 
-    // init_case = 0;
+    //     if (!u_full || !v_full || !p_full || !flag_full)
+    //     {
+    //         fprintf(stderr, "Full grid array %d\n", rank);
+    //         fprintf(stderr, "Couldn't allocate memory for matrices.\n");
+
+    //         return 1;
+    //     }
+
+    //     /* Read in initial values from a file if it exists */
+    //     init_case = read_bin(u_full, v_full, p_full, flag_full, imax, jmax, xlength, ylength, infile);
+    //     MPI_Bcast(&init_case, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    // }
+    // MPI_Bcast(&init_case, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    // if (init_case > 0)
+    // {
+    //     /* Error while reading file */
+    //     return 1;
+    // }
+
+    // // If the file exists, correctly
+    // if (init_case == 0)
+    // {
+    //     int sv_disp[0];
+    //     // Displacements for root node only. The root node scatters the data
+    //     if (rank == 0)
+    //     {
+    //         // Displacement array for mpi_scatterv stores offsets
+    //         int sv_disp[n_nodes];
+    //         sv_disp[0] = 0;
+
+    //         int sum = -1; // Subtract 1 to capture left column from left node
+    //         for (int i = 1; i < n_nodes; i++)
+    //         {
+    //             sum = sum + i_width_arr[i - 1];
+    //             sv_disp[i] = sum;
+    //         }
+    //     }
+
+    //     // First 3 arguments of scatterv are NULL for receiving nodes!
+    //     // Send out the u,v,p and flag arrays to each node.
+    //     // The full grid array is split based on the i_widths and displacements from the 0th column
+    //     MPI_Scatterv(u_full, i_width_arr_exp, sv_disp, MPI_FLOAT, u, imax_node + 2, MPI_FLOAT, 0, MPI_COMM_WORLD);
+    //     MPI_Scatterv(v_full, i_width_arr_exp, sv_disp, MPI_FLOAT, v, imax_node + 2, MPI_FLOAT, 0, MPI_COMM_WORLD);
+    //     MPI_Scatterv(p_full, i_width_arr_exp, sv_disp, MPI_FLOAT, p, imax_node + 2, MPI_FLOAT, 0, MPI_COMM_WORLD);
+    //     MPI_Scatterv(flag_full, i_width_arr_exp, sv_disp, MPI_CHAR, flag, imax_node + 2, MPI_CHAR, 0, MPI_COMM_WORLD);
+    // }
+
+    init_case = 0;
     if (rank == 0)
     {
         /* Allocate arrays for full grid */
@@ -223,7 +297,9 @@ int main(int argc, char *argv[])
 
         if (!u_full || !v_full || !p_full || !flag_full)
         {
+            fprintf(stderr, "Full grid array %d\n", rank);
             fprintf(stderr, "Couldn't allocate memory for matrices.\n");
+
             return 1;
         }
 
@@ -246,7 +322,7 @@ int main(int argc, char *argv[])
             int sum = -1; // Subtract 1 to capture left column from left node
             for (int i = 1; i < n_nodes; i++)
             {
-                sum = sum + i_width_arr[i - 1]; 
+                sum = sum + i_width_arr[i - 1];
                 sv_disp[i] = sum;
             }
 
@@ -287,10 +363,8 @@ int main(int argc, char *argv[])
             }
         }
         init_flag(flag, imax_node, jmax, delx, dely, &ibound, rank, n_nodes);
-        apply_boundary_conditions(u, v, flag, imax, jmax, ui, vi);
+        apply_boundary_conditions(u, v, flag, imax_node, jmax, ui, vi, rank, n_nodes);
     }
-
-
 
     /* Main loop */
     // for (t = 0.0; t < t_end; t += del_t, iters++) {
@@ -320,18 +394,47 @@ int main(int argc, char *argv[])
     //     apply_boundary_conditions(u, v, flag, imax, jmax, ui, vi);
     // } /* End of main loop */
 
-    if (outfile != NULL && strcmp(outfile, "") != 0 && proc == 0)
+    // // Displacements for root node only. The root node scatters the data
+    // if (rank == 0)
+    // {
+    //     // Displacement array for mpi_scatterv stores offsets
+    //     int sv_disp[n_nodes];
+    //     sv_disp[0] = 0;
+
+    //     int sum = -1; // Subtract 1 to capture left column from left node
+    //     for (int i = 1; i < n_nodes; i++)
+    //     {
+    //         sum = sum + i_width_arr[i - 1];
+    //         sv_disp[i] = sum;
+    //     }
+
+    //     // First 3 arguments of scatterv are NULL for receiving nodes!
+    //     // Send out the u,v,p and flag arrays to each node.
+    //     // The full grid array is split based on the i_widths and displacements from the 0th column
+    //     MPI_Gatherv(u, imax_node + 2, MPI_FLOAT, u_full, i_width_arr_exp, sv_disp, MPI_FLOAT, 0, MPI_COMM_WORLD);
+    // }
+
+    // MPI_Scatterv(v_full, i_width_arr_exp, sv_disp, MPI_FLOAT, v, imax_node + 2, MPI_FLOAT, 0, MPI_COMM_WORLD);
+    // MPI_Scatterv(p_full, i_width_arr_exp, sv_disp, MPI_FLOAT, p, imax_node + 2, MPI_FLOAT, 0, MPI_COMM_WORLD);
+    // MPI_Scatterv(flag_full, i_width_arr_exp, sv_disp, MPI_CHAR, flag, imax_node + 2, MPI_CHAR, 0, MPI_COMM_WORLD);
+
+    if (rank == 0)
     {
-        write_bin(u, v, p, flag, imax, jmax, xlength, ylength, outfile);
+        if (outfile != NULL && strcmp(outfile, "") != 0 && proc == 0)
+        {
+            write_bin(u, v, p, flag, imax_node, jmax, xlength, ylength, outfile);
+        }
     }
 
-    free_matrix(u);
-    free_matrix(v);
-    free_matrix(f);
-    free_matrix(g);
-    free_matrix(p);
-    free_matrix(rhs);
-    free_matrix(flag);
+    // free_matrix(u);
+    // free_matrix(v);
+    // free_matrix(f);
+    // free_matrix(g);
+    // free_matrix(p);
+    // free_matrix(rhs);
+    // free_matrix(flag);
+
+    MPI_Finalize();
 
     return 0;
 }
@@ -417,7 +520,6 @@ int read_bin(float **u, float **v, float **p, char **flag,
     fclose(fp);
     return 0;
 }
-
 
 // /* Read the simulation state from a file */
 // int mpi_read_bin(int imax, int jmax, float **u, float **v, float **p, char **flag, char *file)
