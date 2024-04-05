@@ -9,7 +9,7 @@
  * edges of the matrix.
  */
 void apply_boundary_conditions(float **u, float **v, char **flag,
-                               int imax, int jmax, float ui, float vi, int rank, int n_nodes)
+                               int imax, int jmax, float ui, float vi, int rank, int n_nodes, int initial)
 {
     int i, j;
 
@@ -39,16 +39,20 @@ void apply_boundary_conditions(float **u, float **v, char **flag,
         v[i][0] = 0.0;
         u[i][0] = u[i][1];
     }
+    printf("HERE 20 %d\n", rank);
 
     MPI_Status status; // Status of the received message
     int node_release_tag = 0;
     int node_update_tag = 1;
+
     // Wait for left node to update velocities (flow from left to right)
     if (rank != 0)
     {
         MPI_Recv(u[0], jmax + 2, MPI_FLOAT, rank - 1, node_release_tag, MPI_COMM_WORLD, &status);
         MPI_Recv(v[0], jmax + 2, MPI_FLOAT, rank - 1, node_release_tag, MPI_COMM_WORLD, &status);
     }
+
+    printf("HERE 30 %d\n", rank);
 
     /* Apply no-slip boundary conditions to cells that are adjacent to
      * internal obstacle cells. This forces the u and v velocity to
@@ -111,12 +115,16 @@ void apply_boundary_conditions(float **u, float **v, char **flag,
         }
     }
 
+    printf("HERE 40 %d\n", rank);
+
     // Send right edge to next node. Releases the node
-    if (rank != n_nodes - 1)
+    if ((rank != n_nodes - 1) && (!initial))
     {
         MPI_Send(u[imax], jmax + 2, MPI_FLOAT, rank + 1, node_release_tag, MPI_COMM_WORLD);
         MPI_Send(v[imax], jmax + 2, MPI_FLOAT, rank + 1, node_release_tag, MPI_COMM_WORLD);
     }
+
+    printf("HERE 50 %d\n", rank);
 
     // Update right edge of previous node.
     // Send to left node
@@ -127,13 +135,15 @@ void apply_boundary_conditions(float **u, float **v, char **flag,
     }
 
     // Receive from right node
-    if (rank != n_nodes - 1)
+    if ((rank != n_nodes - 1) && (!initial))
     {
         MPI_Recv(u[imax + 1], jmax + 2, MPI_FLOAT, rank + 1, node_update_tag, MPI_COMM_WORLD, &status);
         MPI_Recv(v[imax + 1], jmax + 2, MPI_FLOAT, rank + 1, node_update_tag, MPI_COMM_WORLD, &status);
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    if(!initial){
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
 
     /* Finally, fix the horizontal velocity at the  western edge to have
      * a continual flow of fluid into the simulation.

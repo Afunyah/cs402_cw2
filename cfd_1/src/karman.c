@@ -152,8 +152,7 @@ int main(int argc, char *argv[])
 
     int rank;    // My rank
     int n_nodes; // Total number of processes
-    int tag = 0; // Message tag
-    MPI_Status status; 
+    MPI_Status status;
 
     int *sv_disp;
     int *i_width_arr;
@@ -172,11 +171,6 @@ int main(int argc, char *argv[])
     delx = xlength / imax;
     dely = ylength / jmax;
     int imax_node = 0;
-    // int i_width_arr[n_nodes];     // Workload per node
-    // int i_width_arr_exp[n_nodes]; // Expanded for boundaries
-
-    // memset(i_width_arr, 0, n_nodes * sizeof(int));
-    // memset(i_width_arr_exp, 0, n_nodes * sizeof(int));
 
     if (rank == 0)
     {
@@ -209,19 +203,9 @@ int main(int argc, char *argv[])
         MPI_Scatter(NULL, 1, MPI_INT, &imax_node, 1, MPI_INT, 0, MPI_COMM_WORLD); // Send imax of each node
     }
 
-    // MPI_Scatter(i_width_arr, 1, MPI_INT, &imax_node, 1, MPI_INT, 0, MPI_COMM_WORLD); // Send imax of each node
     printf("imax node =  %d\n", imax_node);
 
     int i_start = rank * imax_node; // Offset from 0, in terms of i
-
-    /* Allocate arrays */
-    // u = alloc_floatmatrix(imax + 2, jmax + 2);
-    // v = alloc_floatmatrix(imax + 2, jmax + 2);
-    // f = alloc_floatmatrix(imax + 2, jmax + 2);
-    // g = alloc_floatmatrix(imax + 2, jmax + 2);
-    // p = alloc_floatmatrix(imax + 2, jmax + 2);
-    // rhs = alloc_floatmatrix(imax + 2, jmax + 2);
-    // flag = alloc_charmatrix(imax + 2, jmax + 2);
 
     /* Allocate arrays */
     // The size of the i array will include 2 buffers
@@ -333,56 +317,60 @@ int main(int argc, char *argv[])
         }
 
         /* Read in initial values from a file if it exists */
-        init_case = read_bin(u_full, v_full, p_full, flag_full, imax, jmax, xlength, ylength, infile);
+        // init_case = read_bin(u_full, v_full, p_full, flag_full, imax, jmax, xlength, ylength, infile);
+        init_case = -1;
 
         if (init_case > 0)
         {
             /* Error while reading file */
-            MPI_Finalize();
             return 1;
         }
+        printf("HERE -2 %d\n", rank);
+        if (init_case < 0)
+        {
+            printf("HERE -1 %d\n", rank);
+            /* Set initial values if file doesn't exist */
+            for (i = 0; i < imax + 2; i++)
+            {
+                for (j = 0; j < jmax + 2; j++)
+                {
+                    u_full[i][j] = ui;
+                    v_full[i][j] = vi;
+                    p_full[i][j] = 0.0;
+                }
+            }
+            printf("HERE 10 %d\n", rank);
+            init_flag(flag_full, imax, jmax, delx, dely, &ibound, rank, n_nodes);
+            printf("HERE 00 %d\n", rank);
+            apply_boundary_conditions(u_full, v_full, flag_full, imax, jmax, ui, vi, rank, n_nodes, 1);
+            printf("HERE -00 %d\n", rank);
+        }
+        if(init_case == 0){
+            
+        }
 
-        // if (init_case < 0)
-        // {
-        //     /* Set initial values if file doesn't exist */
-        //     for (i = 0; i <= imax + 1; i++)
-        //     {
-        //         for (j = 0; j <= jmax + 1; j++)
-        //         {
-        //             u_full[i][j] = ui;
-        //             v_full[i][j] = vi;
-        //             p_full[i][j] = 0.0;
-        //         }
-        //     }
-        //     init_flag(flag_full, imax, jmax, delx, dely, &ibound);
-        //     apply_boundary_conditions(u_full, v_full, p_full, flag_full, imax, jmax, ui, vi, rank, );
-        // }
-        int node;
-
-        for (node = 1; node < n_nodes; node++)
+        for (int n = 1; n < n_nodes; n++)
         {
             // now need to construct the array specifically for the ith MPI node
             for (i = 0; i < imax_node + 2; i++)
             {
-                int pos = sv_disp[node] + i;
+                int offset = sv_disp[n] + i;
                 for (j = 0; j < jmax + 2; j++)
                 {
-                    u[i][j] = u_full[pos][j];
-                    v[i][j] = v_full[pos][j];
-                    p[i][j] = p_full[pos][j];
-                    flag[i][j] = flag_full[pos][j];
+                    u[i][j] = u_full[offset][j];
+                    v[i][j] = v_full[offset][j];
+                    p[i][j] = p_full[offset][j];
+                    flag[i][j] = flag_full[offset][j];
                 }
             }
             // Send the four necessary arrays
-            // printf("Root is now sending arrays to node %d\n",node);
-            // Can not parallelize this with OMP because the positions can't be guaranteed
+
             for (i = 0; i < imax_node + 2; i++)
             {
-                MPI_Send(u[i], jmax + 2, MPI_FLOAT, node, tag, MPI_COMM_WORLD);
-                MPI_Send(v[i], jmax + 2, MPI_FLOAT, node, tag, MPI_COMM_WORLD);
-                MPI_Send(p[i], jmax + 2, MPI_FLOAT, node, tag, MPI_COMM_WORLD);
-                MPI_Send(flag[i], jmax + 2, MPI_CHAR, node, tag, MPI_COMM_WORLD);
-                // printf("Root has sent round %d of %d\n", i+1, imaxNode+2); // Debug
+                MPI_Send(u[i], jmax + 2, MPI_FLOAT, n, 0, MPI_COMM_WORLD);
+                MPI_Send(v[i], jmax + 2, MPI_FLOAT, n, 0, MPI_COMM_WORLD);
+                MPI_Send(p[i], jmax + 2, MPI_FLOAT, n, 0, MPI_COMM_WORLD);
+                MPI_Send(flag[i], jmax + 2, MPI_CHAR, n, 0, MPI_COMM_WORLD);
             }
         }
         MPI_Barrier(MPI_COMM_WORLD);
@@ -400,17 +388,17 @@ int main(int argc, char *argv[])
         }
     }
     else
-    { 
+    {
         // printf("Node %d is still active having finished the handshake\n", rank);
 
         // Reaching this point means the handshake has been completed
         // need to loop through and get the columns separately!
         for (i = 0; i < imax_node + 2; i++)
         {
-            MPI_Recv(u[i], jmax + 2, MPI_FLOAT, 0, tag, MPI_COMM_WORLD, &status);
-            MPI_Recv(v[i], jmax + 2, MPI_FLOAT, 0, tag, MPI_COMM_WORLD, &status);
-            MPI_Recv(p[i], jmax + 2, MPI_FLOAT, 0, tag, MPI_COMM_WORLD, &status);
-            MPI_Recv(flag[i], jmax + 2, MPI_CHAR, 0, tag, MPI_COMM_WORLD, &status);
+            MPI_Recv(u[i], jmax + 2, MPI_FLOAT, 0, 0, MPI_COMM_WORLD, &status);
+            MPI_Recv(v[i], jmax + 2, MPI_FLOAT, 0, 0, MPI_COMM_WORLD, &status);
+            MPI_Recv(p[i], jmax + 2, MPI_FLOAT, 0, 0, MPI_COMM_WORLD, &status);
+            MPI_Recv(flag[i], jmax + 2, MPI_CHAR, 0, 0, MPI_COMM_WORLD, &status);
             // Debug line
             // printf("Node %d successfully received round %d of %d array values\n",rank, i+1, imaxNode+2);
         }
@@ -511,21 +499,21 @@ int main(int argc, char *argv[])
     // }
 
     // If there is no initial state
-    if (init_case < 0)
-    {
-        /* Set initial values if file doesn't exist */
-        for (i = 0; i <= imax_node + 1; i++)
-        {
-            for (j = 0; j <= jmax + 1; j++)
-            {
-                u[i][j] = ui;
-                v[i][j] = vi;
-                p[i][j] = 0.0;
-            }
-        }
-        init_flag(flag, imax_node, jmax, delx, dely, &ibound, rank, n_nodes);
-        apply_boundary_conditions(u, v, flag, imax_node, jmax, ui, vi, rank, n_nodes);
-    }
+    // if (init_case < 0)
+    // {
+    //     /* Set initial values if file doesn't exist */
+    //     for (i = 0; i <= imax_node + 1; i++)
+    //     {
+    //         for (j = 0; j <= jmax + 1; j++)
+    //         {
+    //             u[i][j] = ui;
+    //             v[i][j] = vi;
+    //             p[i][j] = 0.0;
+    //         }
+    //     }
+    //     init_flag(flag, imax_node, jmax, delx, dely, &ibound, rank, n_nodes);
+    //     apply_boundary_conditions(u, v, flag, imax_node, jmax, ui, vi, rank, n_nodes);
+    // }
 
     /* Main loop */
     // for (t = 0.0; t < t_end; t += del_t, iters++) {
@@ -686,8 +674,6 @@ int main(int argc, char *argv[])
     // free_matrix(rhs);
     // free_matrix(flag);
 
-    int node;
-
     // Need to collate all of the data
     if (rank == 0)
     {
@@ -710,54 +696,40 @@ int main(int argc, char *argv[])
         }
 
         printf("Here 5 %d\n", rank);
-        for (node = 1; node < n_nodes; node++)
+        for (int n = 1; n < n_nodes; n++)
         {
-            // if this is the last node, we need to transfer the far edge again
-            int imaxLocal = imax_node;
-            if (node == n_nodes - 1)
-                imaxLocal++;
             for (i = 0; i < imax_node + 2; i++)
             {
-                // int pos = imax_node + ((node - 1) * imax_node) + i;
-                int pos = sv_disp[node] + i;
-                MPI_Recv(u_final[pos], jmax + 2, MPI_FLOAT, node, tag, MPI_COMM_WORLD, &status);
-                MPI_Recv(v_final[pos], jmax + 2, MPI_FLOAT, node, tag, MPI_COMM_WORLD, &status);
-                MPI_Recv(p_final[pos], jmax + 2, MPI_FLOAT, node, tag, MPI_COMM_WORLD, &status);
-                MPI_Recv(flag_final[pos], jmax + 2, MPI_CHAR, node, tag, MPI_COMM_WORLD, &status);
-                // printf("Root has received round %d of %d\n", i, imax_node+1); // Debug
+                int offset = sv_disp[n] + i;
+                MPI_Recv(u_final[offset], jmax + 2, MPI_FLOAT, n, 0, MPI_COMM_WORLD, &status);
+                MPI_Recv(v_final[offset], jmax + 2, MPI_FLOAT, n, 0, MPI_COMM_WORLD, &status);
+                MPI_Recv(p_final[offset], jmax + 2, MPI_FLOAT, n, 0, MPI_COMM_WORLD, &status);
+                MPI_Recv(flag_final[offset], jmax + 2, MPI_CHAR, n, 0, MPI_COMM_WORLD, &status);
             }
             printf("Here 4 %d\n", rank);
-            /*
-             * There are additional values in the far right boundary of the final node
-             * however these are never modified, so they do not need to be retransferred
-             */
         }
     }
     else
     {
-        // Send the information that is within out vertical bounds
-        int imaxLocal = imax_node;
-        if (rank == n_nodes - 1)
-            imaxLocal++;
+
         for (i = 0; i < imax_node + 2; i++)
         {
-            MPI_Send(u[i], jmax + 2, MPI_FLOAT, 0, tag, MPI_COMM_WORLD);
-            MPI_Send(v[i], jmax + 2, MPI_FLOAT, 0, tag, MPI_COMM_WORLD);
-            MPI_Send(p[i], jmax + 2, MPI_FLOAT, 0, tag, MPI_COMM_WORLD);
-            MPI_Send(flag[i], jmax + 2, MPI_CHAR, 0, tag, MPI_COMM_WORLD);
+            MPI_Send(u[i], jmax + 2, MPI_FLOAT, 0, 0, MPI_COMM_WORLD);
+            MPI_Send(v[i], jmax + 2, MPI_FLOAT, 0, 0, MPI_COMM_WORLD);
+            MPI_Send(p[i], jmax + 2, MPI_FLOAT, 0, 0, MPI_COMM_WORLD);
+            MPI_Send(flag[i], jmax + 2, MPI_CHAR, 0, 0, MPI_COMM_WORLD);
         }
-        // printf("Node %d has send their arrays back to root\n", rank);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    // Only the first node can write the file
-    if (outfile != NULL && strcmp(outfile, "") != 0 && proc == 0 && rank == 0)
+    if (rank == 0)
     {
-        write_bin(u_final, v_final, p_final, flag_final, imax, jmax, xlength, ylength, outfile);
-        printf("Root node has written the file\n");
+        if (outfile != NULL && strcmp(outfile, "") != 0 && proc == 0)
+        {
+            write_bin(u_final, v_final, p_final, flag_final, imax, jmax, xlength, ylength, outfile);
+        }
     }
-
     MPI_Finalize();
 
     return 0;

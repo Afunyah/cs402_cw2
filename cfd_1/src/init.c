@@ -113,7 +113,7 @@ void init_flag(char **flag, int imax, int jmax, float delx, float dely,
 {
     int i, j;
     float mx, my, x, y, rad1;
-
+    printf("HERE 100 %d\n", rank);
     /* Mark a circular obstacle as boundary cells, the rest as fluid */
     mx = 20.0 / 41.0 * jmax * dely;
     my = mx;
@@ -128,13 +128,14 @@ void init_flag(char **flag, int imax, int jmax, float delx, float dely,
         }
     }
 
+    printf("HERE 200 %d\n", rank);
     /* Mark the north & south boundary cells */
     for (i = 0; i <= imax + 1; i++)
     {
         flag[i][0] = C_B;
         flag[i][jmax + 1] = C_B;
     }
-
+    printf("HERE 300 %d\n", rank);
     /* Mark the east and west boundary cells */
     if (rank == 0)
     {
@@ -143,7 +144,7 @@ void init_flag(char **flag, int imax, int jmax, float delx, float dely,
             flag[0][j] = C_B;
         }
     }
-
+    printf("HERE 400 %d\n", rank);
     if (rank == n_nodes - 1)
     {
         for (j = 1; j <= jmax; j++)
@@ -151,7 +152,7 @@ void init_flag(char **flag, int imax, int jmax, float delx, float dely,
             flag[imax + 1][j] = C_B;
         }
     }
-
+    printf("HERE 500 %d\n", rank);
     /* flags for boundary cells */
     *ibound = 0;
     for (i = 1; i <= imax; i++)
