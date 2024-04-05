@@ -56,7 +56,7 @@ struct read_dat
 
 int main(int argc, char *argv[])
 {
-    int verbose = 1;      /* Verbosity level */
+    int verbose = 2;      /* Verbosity level */
     float xlength = 22.0; /* Width of simulated domain */
     float ylength = 4.1;  /* Height of simulated domain */
     int imax = 660;       /* Number of cells horizontally */
@@ -317,8 +317,8 @@ int main(int argc, char *argv[])
         }
 
         /* Read in initial values from a file if it exists */
-        // init_case = read_bin(u_full, v_full, p_full, flag_full, imax, jmax, xlength, ylength, infile);
-        init_case = -1;
+        init_case = read_bin(u_full, v_full, p_full, flag_full, imax, jmax, xlength, ylength, infile);
+        // init_case = -1;
 
         if (init_case > 0)
         {
@@ -342,13 +342,14 @@ int main(int argc, char *argv[])
             printf("HERE 10 %d\n", rank);
             init_flag(flag_full, imax, jmax, delx, dely, &ibound, rank, n_nodes);
             printf("HERE 00 %d\n", rank);
-            apply_boundary_conditions(u_full, v_full, flag_full, imax, jmax, ui, vi, rank, n_nodes, 1);
+            apply_boundary_conditions(u_full, v_full, flag_full, imax, jmax, ui, vi, rank, n_nodes, 1, 0);
             printf("HERE -00 %d\n", rank);
         }
-        if(init_case == 0){
-            
+        if (init_case == 0)
+        {
         }
 
+        printf("HERE +1 %d\n", rank);
         for (int n = 1; n < n_nodes; n++)
         {
             // now need to construct the array specifically for the ith MPI node
@@ -373,8 +374,8 @@ int main(int argc, char *argv[])
                 MPI_Send(flag[i], jmax + 2, MPI_CHAR, n, 0, MPI_COMM_WORLD);
             }
         }
-        MPI_Barrier(MPI_COMM_WORLD);
 
+        printf("HERE +2 %d\n", rank);
         // Finally, fill in our own array
         for (i = 0; i <= imax_node + 1; i++)
         {
@@ -386,9 +387,11 @@ int main(int argc, char *argv[])
                 flag[i][j] = flag_full[i][j];
             }
         }
+        printf("HERE +3 %d\n", rank);
     }
     else
     {
+        printf("HERE +4 %d\n", rank);
         // printf("Node %d is still active having finished the handshake\n", rank);
 
         // Reaching this point means the handshake has been completed
@@ -402,10 +405,9 @@ int main(int argc, char *argv[])
             // Debug line
             // printf("Node %d successfully received round %d of %d array values\n",rank, i+1, imaxNode+2);
         }
-
-        MPI_Barrier(MPI_COMM_WORLD);
     }
-
+    printf("HERE +5 %d\n", rank);
+    // MPI_Barrier(MPI_COMM_WORLD);
     // int sv_disp[0];
 
     // float **u_full, **v_full, **p_full;
@@ -514,34 +516,45 @@ int main(int argc, char *argv[])
     //     init_flag(flag, imax_node, jmax, delx, dely, &ibound, rank, n_nodes);
     //     apply_boundary_conditions(u, v, flag, imax_node, jmax, ui, vi, rank, n_nodes);
     // }
-
+    MPI_Barrier(MPI_COMM_WORLD);
     /* Main loop */
-    // for (t = 0.0; t < t_end; t += del_t, iters++) {
-    //     set_timestep_interval(&del_t, imax, jmax, delx, dely, u, v, Re, tau);
+    for (t = 0.0; t < t_end; t += del_t, iters++)
+    {
+        set_timestep_interval(&del_t, imax_node, jmax, delx, dely, u, v, Re, tau, rank, n_nodes);
+        // printf("HERE +6 %d\n", rank);
+        ifluid = (imax * jmax) - ibound;
 
-    //     ifluid = (imax * jmax) - ibound;
+        compute_tentative_velocity(u, v, f, g, flag, imax_node, jmax,
+                                   del_t, delx, dely, gamma, Re, rank, n_nodes);
+        // printf("HERE +7 %d\n", rank);
+        compute_rhs(f, g, rhs, flag, imax_node, jmax, del_t, delx, dely);
 
-    //     compute_tentative_velocity(u, v, f, g, flag, imax, jmax,
-    //         del_t, delx, dely, gamma, Re);
+        if (ifluid > 0)
+        {
+            itersor = poisson(p, rhs, flag, imax_node, jmax, delx, dely,
+                              eps, itermax, omega, &res, ifluid, rank, n_nodes, sv_disp);
+        }
+        else
+        {
+            itersor = 0;
+        }
+        // printf("HERE +8 %d\n", rank);
 
-    //     compute_rhs(f, g, rhs, flag, imax, jmax, del_t, delx, dely);
+        // if (rank == 1 && verbose > 1)
+        {
+            printf("%d t:%g, del_t:%g, SOR iters:%3d, res:%e, bcells:%d\n",
+                   iters, t + del_t, del_t, itersor, res, ibound);
+        }
 
-    //     if (ifluid > 0) {
-    //         itersor = poisson(p, rhs, flag, imax, jmax, delx, dely,
-    //                     eps, itermax, omega, &res, ifluid);
-    //     } else {
-    //         itersor = 0;
-    //     }
+        update_velocity(u, v, f, g, p, flag, imax_node, jmax, del_t, delx, dely, rank, n_nodes);
+        // printf("HERE +9 %d\n", rank);
+        apply_boundary_conditions(u, v, flag, imax_node, jmax, ui, vi, rank, n_nodes, 0, iters);
+        // MPI_Barrier(MPI_COMM_WORLD);
+        // printf("HERE +10 %d\n", rank);
+    } /* End of main loop */
 
-    //     if (proc == 0 && verbose > 1) {
-    //         printf("%d t:%g, del_t:%g, SOR iters:%3d, res:%e, bcells:%d\n",
-    //             iters, t+del_t, del_t, itersor, res, ibound);
-    //     }
-
-    //     update_velocity(u, v, f, g, p, flag, imax, jmax, del_t, delx, dely);
-
-    //     apply_boundary_conditions(u, v, flag, imax, jmax, ui, vi);
-    // } /* End of main loop */
+    printf("HERE +++ %d\n", rank);
+    MPI_Barrier(MPI_COMM_WORLD);
     // printf("Here 00 %d\n", rank);
     // // Commit a MPI_Datatype for these arrays.
     // MPI_Datatype MPI_FLOATARRAY;
@@ -673,7 +686,8 @@ int main(int argc, char *argv[])
     // free_matrix(p);
     // free_matrix(rhs);
     // free_matrix(flag);
-
+    // MPI_Barrier(MPI_COMM_WORLD);
+    printf("HERE to write %d\n", rank);
     // Need to collate all of the data
     if (rank == 0)
     {
