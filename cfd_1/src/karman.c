@@ -557,6 +557,26 @@ int main(int argc, char *argv[])
     //     apply_boundary_conditions(u, v, flag, imax_node, jmax, ui, vi, rank, n_nodes);
     // }
     MPI_Barrier(MPI_COMM_WORLD);
+
+    int *disp;
+    int *count_send;
+    int *count_recv;
+    disp = calloc(n_nodes, sizeof(int));
+    count_send = calloc(n_nodes, sizeof(int));
+    count_recv = calloc(n_nodes, sizeof(int));
+
+    if (rank != 0)
+    {
+        count_send[rank - 1] = jmax + 2;
+        count_recv[rank - 1] = jmax + 2;
+    }
+
+    if (rank != n_nodes - 1)
+    {
+        count_send[rank + 1] = jmax + 2;
+        count_recv[rank + 1] = jmax + 2;
+    }
+
     /* Main loop */
     for (t = 0.0; t < t_end; t += del_t, iters++)
     {
@@ -565,14 +585,14 @@ int main(int argc, char *argv[])
         ifluid = (imax * jmax) - ibound;
 
         compute_tentative_velocity(u, v, f, g, flag, imax_node, jmax,
-                                   del_t, delx, dely, gamma, Re, rank, n_nodes);
+                                   del_t, delx, dely, gamma, Re, rank, n_nodes, disp, count_send, count_recv);
         // printf("HERE +7 %d\n", rank);
         compute_rhs(f, g, rhs, flag, imax_node, jmax, del_t, delx, dely);
 
         if (ifluid > 0)
         {
             itersor = poisson(p, rhs, flag, imax_node, jmax, delx, dely,
-                              eps, itermax, omega, &res, ifluid, rank, n_nodes, sv_disp);
+                              eps, itermax, omega, &res, ifluid, rank, n_nodes, sv_disp, disp, count_send, count_recv);
         }
         else
         {
@@ -784,10 +804,10 @@ int main(int argc, char *argv[])
     }
     else
     {
-        MPI_Gatherv(&u[0][0], (imax_node + 2) * (jmax + 2), MPI_FLOAT, NULL,NULL,NULL,NULL,0, MPI_COMM_WORLD);
-        MPI_Gatherv(&v[0][0], (imax_node + 2) * (jmax + 2), MPI_FLOAT, NULL,NULL,NULL,NULL,0, MPI_COMM_WORLD);
-        MPI_Gatherv(&p[0][0], (imax_node + 2) * (jmax + 2), MPI_FLOAT, NULL,NULL,NULL,NULL,0, MPI_COMM_WORLD);
-        MPI_Gatherv(&flag[0][0], (imax_node + 2) * (jmax + 2), MPI_CHAR, NULL,NULL,NULL,NULL,0, MPI_COMM_WORLD);
+        MPI_Gatherv(&u[0][0], (imax_node + 2) * (jmax + 2), MPI_FLOAT, NULL, NULL, NULL, NULL, 0, MPI_COMM_WORLD);
+        MPI_Gatherv(&v[0][0], (imax_node + 2) * (jmax + 2), MPI_FLOAT, NULL, NULL, NULL, NULL, 0, MPI_COMM_WORLD);
+        MPI_Gatherv(&p[0][0], (imax_node + 2) * (jmax + 2), MPI_FLOAT, NULL, NULL, NULL, NULL, 0, MPI_COMM_WORLD);
+        MPI_Gatherv(&flag[0][0], (imax_node + 2) * (jmax + 2), MPI_CHAR, NULL, NULL, NULL, NULL, 0, MPI_COMM_WORLD);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
