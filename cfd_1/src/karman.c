@@ -46,14 +46,6 @@ static struct option long_opts[] = {
     {0, 0, 0, 0}};
 #define GETOPTS "d:hi:o:t:v:Vx:y:"
 
-struct read_dat
-{
-    float *u_read;
-    float *v_read;
-    float *p_read;
-    char *flag_read;
-};
-
 int main(int argc, char *argv[])
 {
     int verbose = 2;      /* Verbosity level */
@@ -155,6 +147,7 @@ int main(int argc, char *argv[])
     MPI_Status status;
 
     int *sv_disp;
+    int *sv_disp2;
     int *i_width_arr;
     int *i_width_arr_exp;
 
@@ -171,6 +164,14 @@ int main(int argc, char *argv[])
     delx = xlength / imax;
     dely = ylength / jmax;
     int imax_node = 0;
+
+    // struct read_dat
+    // {
+    //     float u_read[jmax + 2];
+    //     float v_read[jmax + 2];
+    //     float p_read[jmax + 2];
+    //     char flag_read[jmax + 2];
+    // };
 
     if (rank == 0)
     {
@@ -192,7 +193,8 @@ int main(int argc, char *argv[])
         // Additional columns for node boundaries, stored in root rank
         for (int k = 0; k < n_nodes; k++)
         {
-            i_width_arr_exp[k] = i_width_arr[k] + 2;
+            i_width_arr_exp[k] = (i_width_arr[k]+2)*(jmax+2);
+            // i_width_arr_exp[k] = (i_width_arr[k])*(jmax);
             printf("i_width_arr %d = %d\n", k, i_width_arr[k]);
         }
 
@@ -205,11 +207,9 @@ int main(int argc, char *argv[])
 
     printf("imax node =  %d\n", imax_node);
 
-    int i_start = rank * imax_node; // Offset from 0, in terms of i
-
-    /* Allocate arrays */
-    // The size of the i array will include 2 buffers
-    // This will be used by each node to store data from other nodes and boundaries
+    // /* Allocate arrays */
+    // // The size of the i array will include 2 buffers
+    // // This will be used by each node to store data from other nodes and boundaries
     u = alloc_floatmatrix(imax_node + 2, jmax + 2);
     v = alloc_floatmatrix(imax_node + 2, jmax + 2);
     f = alloc_floatmatrix(imax_node + 2, jmax + 2);
@@ -218,13 +218,13 @@ int main(int argc, char *argv[])
     rhs = alloc_floatmatrix(imax_node + 2, jmax + 2);
     flag = alloc_charmatrix(imax_node + 2, jmax + 2);
 
-    if (!u || !v || !f || !g || !p || !rhs || !flag)
-    {
-        fprintf(stderr, "Rank %d\n", rank);
-        fprintf(stderr, "Couldn't allocate memory for matrices h.\n");
+    // if (!u || !v || !f || !g || !p || !rhs || !flag)
+    // {
+    //     fprintf(stderr, "Rank %d\n", rank);
+    //     fprintf(stderr, "Couldn't allocate memory for matrices h.\n");
 
-        return 1;
-    }
+    //     return 1;
+    // }
 
     // MPI_Datatype MPI_FLOATARRAY;
     // MPI_Type_contiguous(jmax + 2, MPI_FLOAT, &MPI_FLOATARRAY);
@@ -234,15 +234,16 @@ int main(int argc, char *argv[])
     // MPI_Type_contiguous(jmax + 2, MPI_CHAR, &MPI_CHARARRAY);
     // MPI_Type_commit(&MPI_CHARARRAY);
 
-    // /* https://rookiehpc.org/mpi/docs/mpi_type_create_struct/index.html */
+    // // /* https://rookiehpc.org/mpi/docs/mpi_type_create_struct/index.html */
     // MPI_Datatype read_bin_type;
 
-    // // int lengths[4] = {1, 1, 1, 1};
     // int lengths[4] = {1, 1, 1, 1};
+    // // int lengths[4] = {jmax+2, jmax+2, jmax+2, jmax+2};
 
     // MPI_Aint displacements[] = {offsetof(struct read_dat, u_read), offsetof(struct read_dat, v_read), offsetof(struct read_dat, p_read), offsetof(struct read_dat, flag_read)};
 
     // MPI_Datatype types[4] = {MPI_FLOATARRAY, MPI_FLOATARRAY, MPI_FLOATARRAY, MPI_CHARARRAY};
+    // // MPI_Datatype types[4] = {MPI_FLOAT, MPI_FLOAT, MPI_FLOAT, MPI_CHAR};
     // MPI_Type_create_struct(4, lengths, displacements, types, &read_bin_type);
 
     // MPI_Type_commit(&read_bin_type);
@@ -251,7 +252,7 @@ int main(int argc, char *argv[])
     sv_disp = (int *)calloc(n_nodes, sizeof(int));
     if (rank == 0)
     {
-        int sum = 0; // Subtract 1 to capture left column from left node
+        int sum = 0;
         for (int i = 1; i < n_nodes; i++)
         {
             sum = sum + i_width_arr[i - 1];
@@ -262,38 +263,59 @@ int main(int argc, char *argv[])
     MPI_Bcast(sv_disp, n_nodes, MPI_INT, 0, MPI_COMM_WORLD);
     printf("sv_disp %d %d\n", rank, sv_disp[rank]);
 
+    sv_disp2 = (int *)calloc(n_nodes, sizeof(int));
+    if (rank == 0)
+    {
+        int sum = 0;
+        for (int i = 1; i < n_nodes; i++)
+        {
+            sum = sum + i_width_arr[i - 1] * (jmax + 2);
+            sv_disp2[i] = sum;
+            // printf("sv_disp %d %d\n", i, sv_disp[i]);
+        }
+    }
+    MPI_Bcast(sv_disp2, n_nodes, MPI_INT, 0, MPI_COMM_WORLD);
+
     // MPI_File fh;
     // MPI_Offset offset;
-    // MPI_Status status;
+    // // MPI_Status status;
 
     // MPI_Barrier(MPI_COMM_WORLD);
     // int rbtsz;
     // MPI_Type_size(read_bin_type, &rbtsz);
-    // offset = (MPI_Offset)(sizeof(int) * 4 + sv_disp[rank] * rbtsz);
+    // // offset = (MPI_Offset)(sizeof(int) * 4 + sv_disp[rank] * rbtsz);
+    // offset = (MPI_Offset)(sizeof(int) * 2 + sizeof(float) * 2);
+
     // printf("rbtsz %d\n", rbtsz);
 
     // MPI_File_open(MPI_COMM_WORLD, infile, MPI_MODE_RDWR, MPI_INFO_NULL, &fh);
     // MPI_File_set_view(fh, offset, read_bin_type, read_bin_type, "native", MPI_INFO_NULL);
+    // // struct read_dat *uvpflag = (struct read_dat *) malloc ((imax_node+2)*sizeof(struct read_dat));
     // struct read_dat uvpflag;
+    // // uvpflag = (struct read_dat *)calloc(1, sizeof(struct read_dat));
 
-    // // uvpflag = malloc(sizeof(struct read_dat));
-    // uvpflag.u_read = (float *)calloc(jmax + 2, sizeof(float));
-    // uvpflag.v_read = (float *)calloc(jmax + 2, sizeof(float));
-    // uvpflag.p_read = (float *)calloc(jmax + 2, sizeof(float));
-    // uvpflag.flag_read = (char *)calloc(jmax + 2, sizeof(char));
     // for (int i = 0; i < imax_node + 2; i++)
     // {
-    //     MPI_File_read_all(fh, &uvpflag, 1, read_bin_type, &status);
+    //     // MPI_Barrier(MPI_COMM_WORLD);
+
+    //     MPI_File_read(fh, &uvpflag, 1, read_bin_type, &status);
     //     // MPI_File_read_all(fh, u[i], jmax + 2, MPI_FLOAT, &status);
     //     // MPI_File_read_all(fh, v[i], jmax + 2, MPI_FLOAT, &status);
     //     // MPI_File_read_all(fh, p[i], jmax + 2, MPI_FLOAT, &status);
     //     // MPI_File_read_all(fh, flag[i], jmax + 2, MPI_CHAR, &status);
-    //     printf("HEREE %f\n", uvpflag.p_read);
-    //     // u[i] = uvpflag[0].u_read;
-    //     // v[i] = uvpflag[0].v_read;
-    //     // p[i] = uvpflag[0].p_read;
-    //     // flag[i] = uvpflag[0].flag_read;
+    //     if (rank == 0)
+    //     {
+    //         printf("HEREE %f\n", uvpflag.u_read[0]);
+    //         //  int count = 0;
+    //         // MPI_Get_count(&status, read_bin_type, &count);
+    //         // printf("(%d) on read\n", count);
+    //     }
+    //     u[i] = uvpflag.u_read;
+    //     v[i] = uvpflag.v_read;
+    //     p[i] = uvpflag.p_read;
+    //     flag[i] = uvpflag.flag_read;
     // }
+    // // printf("HEREE %f\n", u[0]);
 
     // MPI_Barrier(MPI_COMM_WORLD);
     // MPI_File_close(&fh);
@@ -349,62 +371,80 @@ int main(int argc, char *argv[])
         {
         }
 
-        printf("HERE +1 %d\n", rank);
-        for (int n = 1; n < n_nodes; n++)
-        {
-            // now need to construct the array specifically for the ith MPI node
-            for (i = 0; i < imax_node + 2; i++)
-            {
-                int offset = sv_disp[n] + i;
-                for (j = 0; j < jmax + 2; j++)
-                {
-                    u[i][j] = u_full[offset][j];
-                    v[i][j] = v_full[offset][j];
-                    p[i][j] = p_full[offset][j];
-                    flag[i][j] = flag_full[offset][j];
-                }
-            }
-            // Send the four necessary arrays
+        // printf("HERE +1 %d\n", rank);
+        // for (int n = 1; n < n_nodes; n++)
+        // {
+        //     // now need to construct the array specifically for the ith MPI node
+        //     for (i = 0; i < imax_node + 2; i++)
+        //     {
+        //         int offset = sv_disp[n] + i;
+        //         for (j = 0; j < jmax + 2; j++)
+        //         {
+        //             u[i][j] = u_full[offset][j];
+        //             v[i][j] = v_full[offset][j];
+        //             p[i][j] = p_full[offset][j];
+        //             flag[i][j] = flag_full[offset][j];
+        //         }
+        //     }
+        //     // Send the four necessary arrays
 
-            for (i = 0; i < imax_node + 2; i++)
-            {
-                MPI_Send(u[i], jmax + 2, MPI_FLOAT, n, 0, MPI_COMM_WORLD);
-                MPI_Send(v[i], jmax + 2, MPI_FLOAT, n, 0, MPI_COMM_WORLD);
-                MPI_Send(p[i], jmax + 2, MPI_FLOAT, n, 0, MPI_COMM_WORLD);
-                MPI_Send(flag[i], jmax + 2, MPI_CHAR, n, 0, MPI_COMM_WORLD);
-            }
-        }
+        //     for (i = 0; i < imax_node + 2; i++)
+        //     {  
+        //         MPI_Send(u[i], jmax + 2, MPI_FLOAT, n, 0, MPI_COMM_WORLD);
+        //         MPI_Send(v[i], jmax + 2, MPI_FLOAT, n, 0, MPI_COMM_WORLD);
+        //         MPI_Send(p[i], jmax + 2, MPI_FLOAT, n, 0, MPI_COMM_WORLD);
+        //         MPI_Send(flag[i], jmax + 2, MPI_CHAR, n, 0, MPI_COMM_WORLD);
+        //     }
+        // }
 
-        printf("HERE +2 %d\n", rank);
-        // Finally, fill in our own array
-        for (i = 0; i <= imax_node + 1; i++)
-        {
-            for (j = 0; j <= jmax + 1; j++)
-            {
-                u[i][j] = u_full[i][j];
-                v[i][j] = v_full[i][j];
-                p[i][j] = p_full[i][j];
-                flag[i][j] = flag_full[i][j];
-            }
-        }
+        // printf("HERE +2 %d\n", rank);
+        // // Finally, fill in our own array
+        // for (i = 0; i <= imax_node + 1; i++)
+        // {
+        //     for (j = 0; j <= jmax + 1; j++)
+        //     {
+        //         u[i][j] = u_full[i][j];
+        //         v[i][j] = v_full[i][j];
+        //         p[i][j] = p_full[i][j];
+        //         flag[i][j] = flag_full[i][j];
+        //     }
+        // }
         printf("HERE +3 %d\n", rank);
+    }
+    // else
+    // {
+    //     printf("HERE +4 %d\n", rank);
+    //     // printf("Node %d is still active having finished the handshake\n", rank);
+
+    //     // Reaching this point means the handshake has been completed
+    //     // need to loop through and get the columns separately!
+    //     for (i = 0; i < imax_node + 2; i++)
+    //     {
+    //         MPI_Recv(u[i], jmax + 2, MPI_FLOAT, 0, 0, MPI_COMM_WORLD, &status);
+    //         MPI_Recv(v[i], jmax + 2, MPI_FLOAT, 0, 0, MPI_COMM_WORLD, &status);
+    //         MPI_Recv(p[i], jmax + 2, MPI_FLOAT, 0, 0, MPI_COMM_WORLD, &status);
+    //         MPI_Recv(flag[i], jmax + 2, MPI_CHAR, 0, 0, MPI_COMM_WORLD, &status);
+    //         // Debug line
+    //         // printf("Node %d successfully received round %d of %d array values\n",rank, i+1, imaxNode+2);
+    //     }
+    // }
+    // MPI_Datatype MPI_FLOATARRAY;
+    // MPI_Type_contiguous(jmax, MPI_FLOAT, &MPI_FLOATARRAY);
+    // MPI_Type_commit(&MPI_FLOATARRAY);
+    printf("HERE x+4 %d\n", rank);
+    if (rank == 0)
+    {
+        MPI_Scatterv(&u_full[0][0], i_width_arr_exp, sv_disp2, MPI_FLOAT, &u[0][0], (imax_node+2)*(jmax+2), MPI_FLOAT, 0, MPI_COMM_WORLD);
+        MPI_Scatterv(&v_full[0][0], i_width_arr_exp, sv_disp2, MPI_FLOAT, &v[0][0], (imax_node+2)*(jmax+2), MPI_FLOAT, 0, MPI_COMM_WORLD);
+        MPI_Scatterv(&p_full[0][0], i_width_arr_exp, sv_disp2, MPI_FLOAT, &p[0][0], (imax_node+2)*(jmax+2), MPI_FLOAT, 0, MPI_COMM_WORLD);
+        MPI_Scatterv(&flag_full[0][0], i_width_arr_exp, sv_disp2, MPI_CHAR, &flag[0][0], (imax_node+2)*(jmax+2), MPI_CHAR, 0, MPI_COMM_WORLD);
     }
     else
     {
-        printf("HERE +4 %d\n", rank);
-        // printf("Node %d is still active having finished the handshake\n", rank);
-
-        // Reaching this point means the handshake has been completed
-        // need to loop through and get the columns separately!
-        for (i = 0; i < imax_node + 2; i++)
-        {
-            MPI_Recv(u[i], jmax + 2, MPI_FLOAT, 0, 0, MPI_COMM_WORLD, &status);
-            MPI_Recv(v[i], jmax + 2, MPI_FLOAT, 0, 0, MPI_COMM_WORLD, &status);
-            MPI_Recv(p[i], jmax + 2, MPI_FLOAT, 0, 0, MPI_COMM_WORLD, &status);
-            MPI_Recv(flag[i], jmax + 2, MPI_CHAR, 0, 0, MPI_COMM_WORLD, &status);
-            // Debug line
-            // printf("Node %d successfully received round %d of %d array values\n",rank, i+1, imaxNode+2);
-        }
+        MPI_Scatterv(NULL, NULL, NULL, MPI_FLOAT, &u[0][0], (imax_node+2)*(jmax+2), MPI_FLOAT, 0, MPI_COMM_WORLD);
+        MPI_Scatterv(NULL, NULL, NULL, MPI_FLOAT, &v[0][0], (imax_node+2)*(jmax+2), MPI_FLOAT, 0, MPI_COMM_WORLD);
+        MPI_Scatterv(NULL, NULL, NULL, MPI_FLOAT, &p[0][0], (imax_node+2)*(jmax+2), MPI_FLOAT, 0, MPI_COMM_WORLD);
+        MPI_Scatterv(NULL, NULL, NULL, MPI_FLOAT, &flag[0][0], (imax_node+2)*(jmax+2), MPI_CHAR, 0, MPI_COMM_WORLD);
     }
     printf("HERE +5 %d\n", rank);
     // MPI_Barrier(MPI_COMM_WORLD);
