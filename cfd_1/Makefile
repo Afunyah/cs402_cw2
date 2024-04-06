@@ -3,8 +3,8 @@ SRCDIR := src
 EXECT := $(BUILDDIR)/bin
 
 CC=mpicc
-# CFLAGS=-O3 -Wall -g -pg 
-CFLAGS=-O3 -Wall -g
+CFLAGS=-O3 -Wall -g -pg 
+# CFLAGS=-O3 -Wall -g
 
 $(shell mkdir -p $(EXECT))
 

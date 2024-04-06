@@ -20,12 +20,9 @@ void compute_tentative_velocity(float **u, float **v, float **f, float **g,
     int i, j;
     float du2dx, duvdy, duvdx, dv2dy, laplu, laplv;
 
+    // imax instead of imax - 1, the imax-th and imax-th + 1 are used for inner-nodes
     for (i = 1; i <= imax; i++)
     {
-        // if (rank == n_nodes - 1 && i == imax)
-        // {
-        //     continue;
-        // }
         for (j = 1; j <= jmax; j++)
         {
             /* only if both adjacent cells are fluid cells */
@@ -83,10 +80,13 @@ void compute_tentative_velocity(float **u, float **v, float **f, float **g,
         }
     }
 
-
     MPI_Alltoallv(f[1], count_send1, disp, MPI_FLOAT, f[imax + 1], count_recv1, disp, MPI_FLOAT, MPI_COMM_WORLD);
 
     MPI_Alltoallv(f[imax], count_send2, disp, MPI_FLOAT, f[0], count_recv2, disp, MPI_FLOAT, MPI_COMM_WORLD);
+
+    MPI_Alltoallv(g[1], count_send1, disp, MPI_FLOAT, g[imax + 1], count_recv1, disp, MPI_FLOAT, MPI_COMM_WORLD);
+
+    MPI_Alltoallv(g[imax], count_send2, disp, MPI_FLOAT, g[0], count_recv2, disp, MPI_FLOAT, MPI_COMM_WORLD);
 
     /* f & g at external boundaries */
 
@@ -107,10 +107,6 @@ void compute_tentative_velocity(float **u, float **v, float **f, float **g,
         g[i][0] = v[i][0];
         g[i][jmax] = v[i][jmax];
     }
-
-    // MPI_Alltoallv(g[1], count_send, disp, MPI_FLOAT, g[imax + 1], count_recv, disp, MPI_FLOAT, MPI_COMM_WORLD);
-
-    // MPI_Alltoallv(g[imax], count_send, disp, MPI_FLOAT, g[0], count_recv, disp, MPI_FLOAT, MPI_COMM_WORLD);
 }
 
 /* Calculate the right hand side of the pressure equation */
@@ -204,11 +200,6 @@ int poisson(float **p, float **rhs, char **flag, int imax, int jmax,
                 } /* end of j */
             }     /* end of i */
 
-            // float *left_col;
-            // float *right_col;
-            // left_col = (float *)malloc(sizeof(float) * jmax + 2);
-            // right_col = (float *)malloc(sizeof(float) * jmax + 2);
-
             MPI_Alltoallv(p[1], count_send1, disp, MPI_FLOAT, p[imax + 1], count_recv1, disp, MPI_FLOAT, MPI_COMM_WORLD);
 
             MPI_Alltoallv(p[imax], count_send2, disp, MPI_FLOAT, p[0], count_recv2, disp, MPI_FLOAT, MPI_COMM_WORLD);
@@ -263,12 +254,9 @@ void update_velocity(float **u, float **v, float **f, float **g, float **p,
 {
     int i, j;
 
+    // imax instead of imax - 1, the imax-th and imax-th + 1 are used for inner-nodes
     for (i = 1; i <= imax; i++)
     {
-        if (rank == n_nodes - 1 && i == imax)
-        {
-            continue;
-        }
         for (j = 1; j <= jmax; j++)
         {
             /* only if both adjacent cells are fluid cells */

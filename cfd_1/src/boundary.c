@@ -9,7 +9,7 @@
  * edges of the matrix.
  */
 void apply_boundary_conditions(float **u, float **v, char **flag,
-                               int imax, int jmax, float ui, float vi, int rank, int n_nodes, int initial, int iters)
+                               int imax, int jmax, float ui, float vi, int rank, int n_nodes, int initial)
 {
     int i, j;
 
@@ -39,7 +39,6 @@ void apply_boundary_conditions(float **u, float **v, char **flag,
         v[i][0] = 0.0;
         u[i][0] = u[i][1];
     }
-    // printf("HERE 20 %d\n", rank);
 
     MPI_Status status; // Status of the received message
     int node_release_tag = 0;
@@ -52,7 +51,6 @@ void apply_boundary_conditions(float **u, float **v, char **flag,
         MPI_Recv(v[0], jmax + 2, MPI_FLOAT, rank - 1, node_release_tag, MPI_COMM_WORLD, &status);
     }
 
-    // printf("HERE 30 %d\n", rank);
 
     /* Apply no-slip boundary conditions to cells that are adjacent to
      * internal obstacle cells. This forces the u and v velocity to
@@ -115,21 +113,12 @@ void apply_boundary_conditions(float **u, float **v, char **flag,
         }
     }
 
-    // printf("HERE 40 %d\n", rank);
-
     // Send right edge to next node. Releases the node
     if ((rank != n_nodes - 1) && (!initial))
     {
         MPI_Send(u[imax], jmax + 2, MPI_FLOAT, rank + 1, node_release_tag, MPI_COMM_WORLD);
         MPI_Send(v[imax], jmax + 2, MPI_FLOAT, rank + 1, node_release_tag, MPI_COMM_WORLD);
     }
-
-    // printf("HERE 50 %d\n", rank);
-
-    // if (!initial)
-    // {
-    //     MPI_Barrier(MPI_COMM_WORLD);
-    // }
 
     // Update right edge of previous node.
     // Send to left node
@@ -146,10 +135,6 @@ void apply_boundary_conditions(float **u, float **v, char **flag,
         MPI_Recv(v[imax + 1], jmax + 2, MPI_FLOAT, rank + 1, node_update_tag, MPI_COMM_WORLD, &status);
     }
 
-    
-
-    
-
     /* Finally, fix the horizontal velocity at the  western edge to have
      * a continual flow of fluid into the simulation.
      */
@@ -163,9 +148,4 @@ void apply_boundary_conditions(float **u, float **v, char **flag,
         }
     }
 
-    // if (!initial)
-    // {
-    //     MPI_Barrier(MPI_COMM_WORLD);
-    // }
-    printf("HERE %d --- %d\n", iters, rank);
 }
