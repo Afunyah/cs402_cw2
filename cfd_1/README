@@ -1,0 +1,6 @@
+look at submit.sbatch to run
+
+to compile,
+make clean; make 
+(in top directory)
+The build folder will be created

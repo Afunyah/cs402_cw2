@@ -1,0 +1,3 @@
+#!/bin/bash
+
+./diffbin vanilla/karman_vanilla_2.bin karman.bin

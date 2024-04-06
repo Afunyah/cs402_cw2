@@ -1,0 +1,25 @@
+Loading cs402-mpi
+  Loading requirement: gcc9
+Hello world, from process 2 of 4
+Hello world, from process 3 of 4
+Hello world, from process 1 of 4
+Hello world, from process 0 of 4
+1 imax node =  165
+3 imax node =  165
+2 imax node =  165
+0 imax node =  165
+Could not open file 'doesnotexist.bin': No such file or directory
+Generating default state instead.
+
+Average times for functions (s)
+------------------------------------------
+     set_timestep_interval : 0.000076
+compute_tentative_velocity : 0.000577
+               compute_rhs : 0.000049
+                   poisson : 0.028062
+           update_velocity : 0.000064
+ apply_boundary_conditions : 0.000043
+
+RUNTIME: 6.071052
+
+Saved as karman_875310.ppm
