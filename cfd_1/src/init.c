@@ -4,6 +4,8 @@
 #include <fcntl.h>
 #include "datadef.h"
 
+#include <omp.h>
+
 void load_flag_from_pgm(char **flag, int imax, int jmax, char *filename)
 {
     char buf[80];
@@ -56,8 +58,6 @@ void load_flag_from_pgm(char **flag, int imax, int jmax, char *filename)
     fclose(fp);
 }
 
-
-
 /* Initialize the flag array, marking any obstacle cells and the edge cells
  * as boundaries. The cells adjacent to boundary cells have their relevant
  * flags set too.
@@ -71,6 +71,8 @@ void init_flag(char **flag, int imax, int jmax, float delx, float dely,
     mx = 20.0 / 41.0 * jmax * dely;
     my = mx;
     rad1 = 5.0 / 41.0 * jmax * dely;
+
+// #pragma omp parallel for schedule(static) private(i, j, x, y) collapse(2)
     for (i = 1; i <= imax; i++)
     {
         for (j = 1; j <= jmax; j++)
@@ -81,7 +83,8 @@ void init_flag(char **flag, int imax, int jmax, float delx, float dely,
         }
     }
 
-    /* Mark the north & south boundary cells */
+/* Mark the north & south boundary cells */
+// #pragma omp parallel for schedule(static) private(i)
     for (i = 0; i <= imax + 1; i++)
     {
         flag[i][0] = C_B;
@@ -90,6 +93,7 @@ void init_flag(char **flag, int imax, int jmax, float delx, float dely,
     /* Mark the east and west boundary cells */
     if (rank == 0)
     {
+// #pragma omp parallel for schedule(static) private(j)
         for (j = 1; j <= jmax; j++)
         {
             flag[0][j] = C_B;
@@ -97,6 +101,7 @@ void init_flag(char **flag, int imax, int jmax, float delx, float dely,
     }
     if (rank == n_nodes - 1)
     {
+// #pragma omp parallel for schedule(static) private(j)
         for (j = 1; j <= jmax; j++)
         {
             flag[imax + 1][j] = C_B;

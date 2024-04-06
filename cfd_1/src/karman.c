@@ -11,6 +11,7 @@
 #include "simulation.h"
 
 #include <mpi.h>
+#include <omp.h>
 
 void write_bin(float **u, float **v, float **p, char **flag,
                int imax, int jmax, float xlength, float ylength, char *file);
@@ -143,10 +144,10 @@ int main(int argc, char *argv[])
     int n_nodes; // Total number of processes
     MPI_Status status;
 
-    int *sv_disp;
-    int *sv_disp2;
-    int *i_width_arr;
-    int *i_width_arr_exp;
+    int *sv_disp; // Stores offsets
+    int *sv_disp2; // Stores offsets for scattering and gathering
+    int *i_width_arr; // Stores widths of each node
+    int *i_width_arr_exp; // Stores total number of elements for each node
 
     float **u_final, **v_final, **p_final;
     char **flag_final;
@@ -160,7 +161,7 @@ int main(int argc, char *argv[])
 
     delx = xlength / imax;
     dely = ylength / jmax;
-    int imax_node = 0;
+    int imax_node = 0; // i workload per node
 
     // struct read_dat
     // {
@@ -187,12 +188,13 @@ int main(int argc, char *argv[])
             m += 1;
         }
 
-        // Additional columns for node boundaries, stored in root rank
+        // Calculate total number of elements
         for (int k = 0; k < n_nodes; k++)
         {
             i_width_arr_exp[k] = (i_width_arr[k] + 2) * (jmax + 2);
         }
 
+        // Distibute into imax_node for each node
         MPI_Scatter(i_width_arr, 1, MPI_INT, &imax_node, 1, MPI_INT, 0, MPI_COMM_WORLD); // Send imax of each node
     }
     else
@@ -243,16 +245,17 @@ int main(int argc, char *argv[])
 
     // MPI_Type_commit(&read_bin_type);
 
+
     init_case = 0;
     sv_disp = (int *)calloc(n_nodes, sizeof(int));
     if (rank == 0)
     {
+        // Calculate offset, which is just cumulative sum of node starting points
         int sum = 0;
         for (int i = 1; i < n_nodes; i++)
         {
             sum = sum + i_width_arr[i - 1];
             sv_disp[i] = sum;
-            // printf("sv_disp %d %d\n", i, sv_disp[i]);
         }
     }
     MPI_Bcast(sv_disp, n_nodes, MPI_INT, 0, MPI_COMM_WORLD);
@@ -265,7 +268,6 @@ int main(int argc, char *argv[])
         {
             sum = sum + i_width_arr[i - 1] * (jmax + 2);
             sv_disp2[i] = sum;
-            // printf("sv_disp %d %d\n", i, sv_disp[i]);
         }
         free(i_width_arr);
     }
@@ -316,8 +318,10 @@ int main(int argc, char *argv[])
 
     float **u_full, **v_full, **p_full;
     char **flag_full;
+    // Rank 0 reads the data from the file (or creates new state) and scatters data to other nodes
     if (rank == 0)
     {
+        // Matrices for full grid
         u_full = alloc_floatmatrix(imax + 2, jmax + 2);
         v_full = alloc_floatmatrix(imax + 2, jmax + 2);
         p_full = alloc_floatmatrix(imax + 2, jmax + 2);
@@ -342,6 +346,7 @@ int main(int argc, char *argv[])
         if (init_case < 0)
         {
             /* Set initial values if file doesn't exist */
+            // #pragma omp parallel for schedule(static) private(i,j) collapse(2)
             for (i = 0; i < imax + 2; i++)
             {
                 for (j = 0; j < jmax + 2; j++)
@@ -359,6 +364,7 @@ int main(int argc, char *argv[])
         }
     }
 
+    // Scatter values to each node
     if (rank == 0)
     {
         MPI_Scatterv(&u_full[0][0], i_width_arr_exp, sv_disp2, MPI_FLOAT, &u[0][0], (imax_node + 2) * (jmax + 2), MPI_FLOAT, 0, MPI_COMM_WORLD);
@@ -379,17 +385,24 @@ int main(int argc, char *argv[])
         MPI_Scatterv(NULL, NULL, NULL, MPI_FLOAT, &flag[0][0], (imax_node + 2) * (jmax + 2), MPI_CHAR, 0, MPI_COMM_WORLD);
     }
 
-    int *disp;
+
+    // Data used for alltoall
+    int *disp;  // displacements
+
+    // indicates neighbouring process to share boundaries with
     int *count_send1;
     int *count_recv1;
     int *count_send2;
     int *count_recv2;
+
     disp = calloc(n_nodes, sizeof(int));
     count_send1 = calloc(n_nodes, sizeof(int));
     count_recv1 = calloc(n_nodes, sizeof(int));
     count_send2 = calloc(n_nodes, sizeof(int));
     count_recv2 = calloc(n_nodes, sizeof(int));
 
+    // Ranks should only share data with adjacent ranks
+    // The following logic ensures this
     if (rank != 0)
     {
         count_send1[rank - 1] = jmax + 2;
@@ -402,6 +415,7 @@ int main(int argc, char *argv[])
         count_recv1[rank + 1] = jmax + 2;
     }
 
+    // Timers
     double timestepTime = 0.0;
     double computeVelTime = 0.0;
     double computeRhsTime = 0.0;
@@ -412,6 +426,7 @@ int main(int argc, char *argv[])
     double startTime = 0.0;
     double funcTime = 0.0;
 
+    // Poisson not always executed
     int poisson_iters = 0;
 
     /* Main loop */
@@ -523,6 +538,7 @@ int main(int argc, char *argv[])
         printf("\n");
     }
 
+    // Final matrices to be written to file
     if (rank == 0)
     {
         /* Allocate arrays for full grid */
@@ -532,6 +548,8 @@ int main(int argc, char *argv[])
         flag_final = alloc_charmatrix(imax + 2, jmax + 2);
     }
 
+
+    // Gather data and write to file
     if (rank == 0)
     {
         MPI_Gatherv(&u[0][0], (imax_node + 2) * (jmax + 2), MPI_FLOAT, &u_final[0][0], i_width_arr_exp, sv_disp2, MPI_FLOAT, 0, MPI_COMM_WORLD);

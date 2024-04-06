@@ -1,0 +1,17 @@
+Loading cs402-mpi
+  Loading requirement: gcc9
+Could not open file 'doesnotexist.bin': No such file or directory
+Generating default state instead.
+
+Average times for functions (s)
+------------------------------------------
+     set_timestep_interval : 0.000346
+compute_tentative_velocity : 0.004265
+               compute_rhs : 0.000394
+                   poisson : 0.173563
+           update_velocity : 0.000538
+ apply_boundary_conditions : 0.000060
+
+RUNTIME: 43.591441
+
+Saved as karman_874742.ppm

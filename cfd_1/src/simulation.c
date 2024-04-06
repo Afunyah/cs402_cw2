@@ -5,6 +5,7 @@
 #include "init.h"
 
 #include <mpi.h>
+#include <omp.h>
 
 #define max(x, y) ((x) > (y) ? (x) : (y))
 #define min(x, y) ((x) < (y) ? (x) : (y))
@@ -21,6 +22,7 @@ void compute_tentative_velocity(float **u, float **v, float **f, float **g,
     float du2dx, duvdy, duvdx, dv2dy, laplu, laplv;
 
     // imax instead of imax - 1, the imax-th and imax-th + 1 are used for inner-nodes
+// #pragma omp parallel for schedule(static) private(i, j, du2dx, duvdy, laplu) collapse(2)
     for (i = 1; i <= imax; i++)
     {
         for (j = 1; j <= jmax; j++)
@@ -50,6 +52,7 @@ void compute_tentative_velocity(float **u, float **v, float **f, float **g,
         }
     }
 
+// #pragma omp parallel for schedule(static) private(i, j, duvdx, dv2dy, laplv) collapse(2)
     for (i = 1; i <= imax; i++)
     {
         for (j = 1; j <= jmax - 1; j++)
@@ -80,6 +83,7 @@ void compute_tentative_velocity(float **u, float **v, float **f, float **g,
         }
     }
 
+    // Adjacent ranks swap data!
     MPI_Alltoallv(f[1], count_send1, disp, MPI_FLOAT, f[imax + 1], count_recv1, disp, MPI_FLOAT, MPI_COMM_WORLD);
 
     MPI_Alltoallv(f[imax], count_send2, disp, MPI_FLOAT, f[0], count_recv2, disp, MPI_FLOAT, MPI_COMM_WORLD);
@@ -90,6 +94,7 @@ void compute_tentative_velocity(float **u, float **v, float **f, float **g,
 
     /* f & g at external boundaries */
 
+// #pragma omp parallel for schedule(static) private(j)
     for (j = 1; j <= jmax; j++)
     {
         if (rank == 0)
@@ -102,6 +107,7 @@ void compute_tentative_velocity(float **u, float **v, float **f, float **g,
         }
     }
 
+// #pragma omp parallel for schedule(static) private(i)
     for (i = 1; i <= imax; i++)
     {
         g[i][0] = v[i][0];
@@ -115,6 +121,7 @@ void compute_rhs(float **f, float **g, float **rhs, char **flag, int imax,
 {
     int i, j;
 
+// #pragma omp parallel for schedule(static) private(i, j) collapse(2)
     for (i = 1; i <= imax; i++)
     {
         for (j = 1; j <= jmax; j++)
@@ -145,7 +152,8 @@ int poisson(float **p, float **rhs, char **flag, int imax, int jmax,
     float rdy2 = 1.0 / (dely * dely);
     beta_2 = -omega / (2.0 * (rdx2 + rdy2));
 
-    /* Calculate sum of squares */
+/* Calculate sum of squares */
+// #pragma omp parallel for schedule(static) private(i, j) reduction(+ : p0) collapse(2)
     for (i = 1; i <= imax; i++)
     {
         for (j = 1; j <= jmax; j++)
@@ -161,7 +169,6 @@ int poisson(float **p, float **rhs, char **flag, int imax, int jmax,
     MPI_Reduce(&p0, &mpi_p0, 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
     if (rank == 0)
     {
-
         p0 = sqrt(mpi_p0 / ifull);
         if (p0 < 0.0001)
         {
@@ -176,6 +183,7 @@ int poisson(float **p, float **rhs, char **flag, int imax, int jmax,
     {
         for (rb = 0; rb <= 1; rb++)
         {
+// #pragma omp parallel for schedule(static) private(i, j, beta_mod) collapse(2)
             for (i = 1; i <= imax; i++)
             {
                 for (j = 1; j <= jmax; j++)
@@ -200,6 +208,7 @@ int poisson(float **p, float **rhs, char **flag, int imax, int jmax,
                 } /* end of j */
             }     /* end of i */
 
+            // Adjacent ranks swap data!
             MPI_Alltoallv(p[1], count_send1, disp, MPI_FLOAT, p[imax + 1], count_recv1, disp, MPI_FLOAT, MPI_COMM_WORLD);
 
             MPI_Alltoallv(p[imax], count_send2, disp, MPI_FLOAT, p[0], count_recv2, disp, MPI_FLOAT, MPI_COMM_WORLD);
@@ -254,7 +263,8 @@ void update_velocity(float **u, float **v, float **f, float **g, float **p,
 {
     int i, j;
 
-    // imax instead of imax - 1, the imax-th and imax-th + 1 are used for inner-nodes
+// imax instead of imax - 1, the imax-th and imax-th + 1 are used for inner-nodes
+// #pragma omp parallel for schedule(static) private(i, j) collapse(2)
     for (i = 1; i <= imax; i++)
     {
         for (j = 1; j <= jmax; j++)
@@ -266,6 +276,8 @@ void update_velocity(float **u, float **v, float **f, float **g, float **p,
             }
         }
     }
+
+// #pragma omp parallel for schedule(static) private(i, j) collapse(2)
     for (i = 1; i <= imax; i++)
     {
         for (j = 1; j <= jmax - 1; j++)
@@ -294,6 +306,7 @@ void set_timestep_interval(float *del_t, int imax, int jmax, float delx,
     { /* else no time stepsize control */
         umax = 1.0e-10;
         vmax = 1.0e-10;
+// #pragma omp parallel for schedule(static) private(i, j) reduction(max : umax) collapse(2)
         for (i = 0; i <= imax + 1; i++)
         {
             for (j = 1; j <= jmax + 1; j++)
@@ -301,6 +314,7 @@ void set_timestep_interval(float *del_t, int imax, int jmax, float delx,
                 umax = max(fabs(u[i][j]), umax);
             }
         }
+// #pragma omp parallel for schedule(static) private(i, j) reduction(max : vmax) collapse(2)
         for (i = 1; i <= imax + 1; i++)
         {
             for (j = 0; j <= jmax + 1; j++)

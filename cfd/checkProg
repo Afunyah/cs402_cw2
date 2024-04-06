@@ -1,0 +1,3 @@
+#!/bin/bash
+
+sacct --format JobId,State,Elapsed,Start
