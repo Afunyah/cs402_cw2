@@ -558,23 +558,46 @@ int main(int argc, char *argv[])
     // }
     MPI_Barrier(MPI_COMM_WORLD);
 
+    // int *disp;
+    // int *count_send;
+    // int *count_recv;
+    // disp = calloc(n_nodes, sizeof(int));
+    // count_send = calloc(n_nodes, sizeof(int));
+    // count_recv = calloc(n_nodes, sizeof(int));
+
+    // if (rank != 0)
+    // {
+    //     count_send[rank - 1] = jmax + 2;
+    //     count_recv[rank - 1] = jmax + 2;
+    // }
+
+    // if (rank != n_nodes - 1)
+    // {
+    //     count_send[rank + 1] = jmax + 2;
+    //     count_recv[rank + 1] = jmax + 2;
+    // }
+
     int *disp;
-    int *count_send;
-    int *count_recv;
+    int *count_send1;
+    int *count_recv1;
+    int *count_send2;
+    int *count_recv2;
     disp = calloc(n_nodes, sizeof(int));
-    count_send = calloc(n_nodes, sizeof(int));
-    count_recv = calloc(n_nodes, sizeof(int));
+    count_send1 = calloc(n_nodes, sizeof(int));
+    count_recv1 = calloc(n_nodes, sizeof(int));
+    count_send2 = calloc(n_nodes, sizeof(int));
+    count_recv2 = calloc(n_nodes, sizeof(int));
 
     if (rank != 0)
     {
-        count_send[rank - 1] = jmax + 2;
-        count_recv[rank - 1] = jmax + 2;
+        count_send1[rank - 1] = jmax + 2;
+        count_recv2[rank - 1] = jmax + 2;
     }
 
     if (rank != n_nodes - 1)
     {
-        count_send[rank + 1] = jmax + 2;
-        count_recv[rank + 1] = jmax + 2;
+        count_send2[rank + 1] = jmax + 2;
+        count_recv1[rank + 1] = jmax + 2;
     }
 
     /* Main loop */
@@ -585,14 +608,14 @@ int main(int argc, char *argv[])
         ifluid = (imax * jmax) - ibound;
 
         compute_tentative_velocity(u, v, f, g, flag, imax_node, jmax,
-                                   del_t, delx, dely, gamma, Re, rank, n_nodes, disp, count_send, count_recv);
+                                   del_t, delx, dely, gamma, Re, rank, n_nodes, disp, count_send1, count_recv1, count_send2, count_recv2);
         // printf("HERE +7 %d\n", rank);
         compute_rhs(f, g, rhs, flag, imax_node, jmax, del_t, delx, dely);
 
         if (ifluid > 0)
         {
             itersor = poisson(p, rhs, flag, imax_node, jmax, delx, dely,
-                              eps, itermax, omega, &res, ifluid, rank, n_nodes, sv_disp, disp, count_send, count_recv);
+                              eps, itermax, omega, &res, ifluid, rank, n_nodes, sv_disp, disp, count_send1, count_recv1, count_send2, count_recv2);
         }
         else
         {
@@ -600,7 +623,7 @@ int main(int argc, char *argv[])
         }
         // printf("HERE +8 %d\n", rank);
 
-        // if (rank == 1 && verbose > 1)
+        if (rank == 0 && verbose > 1)
         {
             printf("%d t:%g, del_t:%g, SOR iters:%3d, res:%e, bcells:%d\n",
                    iters, t + del_t, del_t, itersor, res, ibound);

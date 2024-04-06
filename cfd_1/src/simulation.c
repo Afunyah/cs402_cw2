@@ -15,17 +15,17 @@ extern int nprocs, proc;
 /* Computation of tentative velocity field (f, g) */
 void compute_tentative_velocity(float **u, float **v, float **f, float **g,
                                 char **flag, int imax, int jmax, float del_t, float delx, float dely,
-                                float gamma, float Re, int rank, int n_nodes, int *disp, int *count_send, int *count_recv)
+                                float gamma, float Re, int rank, int n_nodes, int *disp, int *count_send1, int *count_recv1, int *count_send2, int *count_recv2)
 {
     int i, j;
     float du2dx, duvdy, duvdx, dv2dy, laplu, laplv;
 
-    for (i = 1; i <= imax - 1; i++)
+    for (i = 1; i <= imax; i++)
     {
-        if (rank == n_nodes - 1 && i == imax)
-        {
-            continue;
-        }
+        // if (rank == n_nodes - 1 && i == imax)
+        // {
+        //     continue;
+        // }
         for (j = 1; j <= jmax; j++)
         {
             /* only if both adjacent cells are fluid cells */
@@ -84,14 +84,9 @@ void compute_tentative_velocity(float **u, float **v, float **f, float **g,
     }
 
 
+    MPI_Alltoallv(f[1], count_send1, disp, MPI_FLOAT, f[imax + 1], count_recv1, disp, MPI_FLOAT, MPI_COMM_WORLD);
 
-    MPI_Alltoallv(f[1], count_send, disp, MPI_FLOAT, f[imax + 1], count_recv, disp, MPI_FLOAT, MPI_COMM_WORLD);
-
-    MPI_Alltoallv(f[imax], count_send, disp, MPI_FLOAT, f[0], count_recv, disp, MPI_FLOAT, MPI_COMM_WORLD);
-
-    MPI_Alltoallv(g[1], count_send, disp, MPI_FLOAT, g[imax + 1], count_recv, disp, MPI_FLOAT, MPI_COMM_WORLD);
-
-    MPI_Alltoallv(g[imax], count_send, disp, MPI_FLOAT, g[0], count_recv, disp, MPI_FLOAT, MPI_COMM_WORLD);
+    MPI_Alltoallv(f[imax], count_send2, disp, MPI_FLOAT, f[0], count_recv2, disp, MPI_FLOAT, MPI_COMM_WORLD);
 
     /* f & g at external boundaries */
 
@@ -99,7 +94,7 @@ void compute_tentative_velocity(float **u, float **v, float **f, float **g,
     {
         if (rank == 0)
         {
-            f[imax][j] = u[imax][j];
+            f[0][j] = u[0][j];
         }
         if (rank == n_nodes - 1)
         {
@@ -112,6 +107,10 @@ void compute_tentative_velocity(float **u, float **v, float **f, float **g,
         g[i][0] = v[i][0];
         g[i][jmax] = v[i][jmax];
     }
+
+    // MPI_Alltoallv(g[1], count_send, disp, MPI_FLOAT, g[imax + 1], count_recv, disp, MPI_FLOAT, MPI_COMM_WORLD);
+
+    // MPI_Alltoallv(g[imax], count_send, disp, MPI_FLOAT, g[0], count_recv, disp, MPI_FLOAT, MPI_COMM_WORLD);
 }
 
 /* Calculate the right hand side of the pressure equation */
@@ -138,7 +137,7 @@ void compute_rhs(float **f, float **g, float **rhs, char **flag, int imax,
 /* Red/Black SOR to solve the poisson equation */
 int poisson(float **p, float **rhs, char **flag, int imax, int jmax,
             float delx, float dely, float eps, int itermax, float omega,
-            float *res, int ifull, int rank, int n_nodes, int *sv_disp, int *disp, int *count_send, int *count_recv)
+            float *res, int ifull, int rank, int n_nodes, int *sv_disp, int *disp, int *count_send1, int *count_recv1, int *count_send2, int *count_recv2)
 {
     int i, j, iter;
     float add, beta_2, beta_mod;
@@ -210,9 +209,9 @@ int poisson(float **p, float **rhs, char **flag, int imax, int jmax,
             // left_col = (float *)malloc(sizeof(float) * jmax + 2);
             // right_col = (float *)malloc(sizeof(float) * jmax + 2);
 
-            MPI_Alltoallv(p[1], count_send, disp, MPI_FLOAT, p[imax + 1], count_recv, disp, MPI_FLOAT, MPI_COMM_WORLD);
+            MPI_Alltoallv(p[1], count_send1, disp, MPI_FLOAT, p[imax + 1], count_recv1, disp, MPI_FLOAT, MPI_COMM_WORLD);
 
-            MPI_Alltoallv(p[imax], count_send, disp, MPI_FLOAT, p[0], count_recv, disp, MPI_FLOAT, MPI_COMM_WORLD);
+            MPI_Alltoallv(p[imax], count_send2, disp, MPI_FLOAT, p[0], count_recv2, disp, MPI_FLOAT, MPI_COMM_WORLD);
 
         } /* end of rb */
 
@@ -264,7 +263,7 @@ void update_velocity(float **u, float **v, float **f, float **g, float **p,
 {
     int i, j;
 
-    for (i = 1; i <= imax - 1; i++)
+    for (i = 1; i <= imax; i++)
     {
         if (rank == n_nodes - 1 && i == imax)
         {
