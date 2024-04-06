@@ -12,5 +12,5 @@
 module purge
 module load cs402-mpi
 
-mpirun ./build/bin/karman
+srun ./build/bin/karman -i initial.bin
 ./save2ppm karman_$SLURM_JOB_ID
