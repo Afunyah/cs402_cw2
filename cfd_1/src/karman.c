@@ -193,7 +193,7 @@ int main(int argc, char *argv[])
         // Additional columns for node boundaries, stored in root rank
         for (int k = 0; k < n_nodes; k++)
         {
-            i_width_arr_exp[k] = (i_width_arr[k]+2)*(jmax+2);
+            i_width_arr_exp[k] = (i_width_arr[k] + 2) * (jmax + 2);
             // i_width_arr_exp[k] = (i_width_arr[k])*(jmax);
             printf("i_width_arr %d = %d\n", k, i_width_arr[k]);
         }
@@ -389,7 +389,7 @@ int main(int argc, char *argv[])
         //     // Send the four necessary arrays
 
         //     for (i = 0; i < imax_node + 2; i++)
-        //     {  
+        //     {
         //         MPI_Send(u[i], jmax + 2, MPI_FLOAT, n, 0, MPI_COMM_WORLD);
         //         MPI_Send(v[i], jmax + 2, MPI_FLOAT, n, 0, MPI_COMM_WORLD);
         //         MPI_Send(p[i], jmax + 2, MPI_FLOAT, n, 0, MPI_COMM_WORLD);
@@ -434,17 +434,17 @@ int main(int argc, char *argv[])
     printf("HERE x+4 %d\n", rank);
     if (rank == 0)
     {
-        MPI_Scatterv(&u_full[0][0], i_width_arr_exp, sv_disp2, MPI_FLOAT, &u[0][0], (imax_node+2)*(jmax+2), MPI_FLOAT, 0, MPI_COMM_WORLD);
-        MPI_Scatterv(&v_full[0][0], i_width_arr_exp, sv_disp2, MPI_FLOAT, &v[0][0], (imax_node+2)*(jmax+2), MPI_FLOAT, 0, MPI_COMM_WORLD);
-        MPI_Scatterv(&p_full[0][0], i_width_arr_exp, sv_disp2, MPI_FLOAT, &p[0][0], (imax_node+2)*(jmax+2), MPI_FLOAT, 0, MPI_COMM_WORLD);
-        MPI_Scatterv(&flag_full[0][0], i_width_arr_exp, sv_disp2, MPI_CHAR, &flag[0][0], (imax_node+2)*(jmax+2), MPI_CHAR, 0, MPI_COMM_WORLD);
+        MPI_Scatterv(&u_full[0][0], i_width_arr_exp, sv_disp2, MPI_FLOAT, &u[0][0], (imax_node + 2) * (jmax + 2), MPI_FLOAT, 0, MPI_COMM_WORLD);
+        MPI_Scatterv(&v_full[0][0], i_width_arr_exp, sv_disp2, MPI_FLOAT, &v[0][0], (imax_node + 2) * (jmax + 2), MPI_FLOAT, 0, MPI_COMM_WORLD);
+        MPI_Scatterv(&p_full[0][0], i_width_arr_exp, sv_disp2, MPI_FLOAT, &p[0][0], (imax_node + 2) * (jmax + 2), MPI_FLOAT, 0, MPI_COMM_WORLD);
+        MPI_Scatterv(&flag_full[0][0], i_width_arr_exp, sv_disp2, MPI_CHAR, &flag[0][0], (imax_node + 2) * (jmax + 2), MPI_CHAR, 0, MPI_COMM_WORLD);
     }
     else
     {
-        MPI_Scatterv(NULL, NULL, NULL, MPI_FLOAT, &u[0][0], (imax_node+2)*(jmax+2), MPI_FLOAT, 0, MPI_COMM_WORLD);
-        MPI_Scatterv(NULL, NULL, NULL, MPI_FLOAT, &v[0][0], (imax_node+2)*(jmax+2), MPI_FLOAT, 0, MPI_COMM_WORLD);
-        MPI_Scatterv(NULL, NULL, NULL, MPI_FLOAT, &p[0][0], (imax_node+2)*(jmax+2), MPI_FLOAT, 0, MPI_COMM_WORLD);
-        MPI_Scatterv(NULL, NULL, NULL, MPI_FLOAT, &flag[0][0], (imax_node+2)*(jmax+2), MPI_CHAR, 0, MPI_COMM_WORLD);
+        MPI_Scatterv(NULL, NULL, NULL, MPI_FLOAT, &u[0][0], (imax_node + 2) * (jmax + 2), MPI_FLOAT, 0, MPI_COMM_WORLD);
+        MPI_Scatterv(NULL, NULL, NULL, MPI_FLOAT, &v[0][0], (imax_node + 2) * (jmax + 2), MPI_FLOAT, 0, MPI_COMM_WORLD);
+        MPI_Scatterv(NULL, NULL, NULL, MPI_FLOAT, &p[0][0], (imax_node + 2) * (jmax + 2), MPI_FLOAT, 0, MPI_COMM_WORLD);
+        MPI_Scatterv(NULL, NULL, NULL, MPI_FLOAT, &flag[0][0], (imax_node + 2) * (jmax + 2), MPI_CHAR, 0, MPI_COMM_WORLD);
     }
     printf("HERE +5 %d\n", rank);
     // MPI_Barrier(MPI_COMM_WORLD);
@@ -737,42 +737,57 @@ int main(int argc, char *argv[])
         p_final = alloc_floatmatrix(imax + 2, jmax + 2);
         flag_final = alloc_charmatrix(imax + 2, jmax + 2);
 
-        // Make sure to write the root information to the larger temp array as well
-        for (i = 0; i < imax_node + 2; i++)
-        {
-            for (j = 0; j < jmax + 2; j++)
-            {
-                u_final[i][j] = u[i][j];
-                v_final[i][j] = v[i][j];
-                p_final[i][j] = p[i][j];
-                flag_final[i][j] = flag[i][j];
-            }
-        }
+        // // Make sure to write the root information to the larger temp array as well
+        // for (i = 0; i < imax_node + 2; i++)
+        // {
+        //     for (j = 0; j < jmax + 2; j++)
+        //     {
+        //         // u_final[i][j] = u[i][j];
+        //         v_final[i][j] = v[i][j];
+        //         p_final[i][j] = p[i][j];
+        //         flag_final[i][j] = flag[i][j];
+        //     }
+        // }
 
-        printf("Here 5 %d\n", rank);
-        for (int n = 1; n < n_nodes; n++)
-        {
-            for (i = 0; i < imax_node + 2; i++)
-            {
-                int offset = sv_disp[n] + i;
-                MPI_Recv(u_final[offset], jmax + 2, MPI_FLOAT, n, 0, MPI_COMM_WORLD, &status);
-                MPI_Recv(v_final[offset], jmax + 2, MPI_FLOAT, n, 0, MPI_COMM_WORLD, &status);
-                MPI_Recv(p_final[offset], jmax + 2, MPI_FLOAT, n, 0, MPI_COMM_WORLD, &status);
-                MPI_Recv(flag_final[offset], jmax + 2, MPI_CHAR, n, 0, MPI_COMM_WORLD, &status);
-            }
-            printf("Here 4 %d\n", rank);
-        }
+        // printf("Here 5 %d\n", rank);
+        // for (int n = 1; n < n_nodes; n++)
+        // {
+        //     for (i = 0; i < imax_node + 2; i++)
+        //     {
+        //         int offset = sv_disp[n] + i;
+        //         // MPI_Recv(u_final[offset], jmax + 2, MPI_FLOAT, n, 0, MPI_COMM_WORLD, &status);
+        //         MPI_Recv(v_final[offset], jmax + 2, MPI_FLOAT, n, 0, MPI_COMM_WORLD, &status);
+        //         MPI_Recv(p_final[offset], jmax + 2, MPI_FLOAT, n, 0, MPI_COMM_WORLD, &status);
+        //         MPI_Recv(flag_final[offset], jmax + 2, MPI_CHAR, n, 0, MPI_COMM_WORLD, &status);
+        //     }
+        //     printf("Here 4 %d\n", rank);
+        // }
+    }
+    // else
+    // {
+
+    //     for (i = 0; i < imax_node + 2; i++)
+    //     {
+    //         // MPI_Send(u[i], jmax + 2, MPI_FLOAT, 0, 0, MPI_COMM_WORLD);
+    //         MPI_Send(v[i], jmax + 2, MPI_FLOAT, 0, 0, MPI_COMM_WORLD);
+    //         MPI_Send(p[i], jmax + 2, MPI_FLOAT, 0, 0, MPI_COMM_WORLD);
+    //         MPI_Send(flag[i], jmax + 2, MPI_CHAR, 0, 0, MPI_COMM_WORLD);
+    //     }
+    // }
+
+    if (rank == 0)
+    {
+        MPI_Gatherv(&u[0][0], (imax_node + 2) * (jmax + 2), MPI_FLOAT, &u_final[0][0], i_width_arr_exp, sv_disp2, MPI_FLOAT, 0, MPI_COMM_WORLD);
+        MPI_Gatherv(&v[0][0], (imax_node + 2) * (jmax + 2), MPI_FLOAT, &v_final[0][0], i_width_arr_exp, sv_disp2, MPI_FLOAT, 0, MPI_COMM_WORLD);
+        MPI_Gatherv(&p[0][0], (imax_node + 2) * (jmax + 2), MPI_FLOAT, &p_final[0][0], i_width_arr_exp, sv_disp2, MPI_FLOAT, 0, MPI_COMM_WORLD);
+        MPI_Gatherv(&flag[0][0], (imax_node + 2) * (jmax + 2), MPI_CHAR, &flag_final[0][0], i_width_arr_exp, sv_disp2, MPI_CHAR, 0, MPI_COMM_WORLD);
     }
     else
     {
-
-        for (i = 0; i < imax_node + 2; i++)
-        {
-            MPI_Send(u[i], jmax + 2, MPI_FLOAT, 0, 0, MPI_COMM_WORLD);
-            MPI_Send(v[i], jmax + 2, MPI_FLOAT, 0, 0, MPI_COMM_WORLD);
-            MPI_Send(p[i], jmax + 2, MPI_FLOAT, 0, 0, MPI_COMM_WORLD);
-            MPI_Send(flag[i], jmax + 2, MPI_CHAR, 0, 0, MPI_COMM_WORLD);
-        }
+        MPI_Gatherv(&u[0][0], (imax_node + 2) * (jmax + 2), MPI_FLOAT, NULL,NULL,NULL,NULL,0, MPI_COMM_WORLD);
+        MPI_Gatherv(&v[0][0], (imax_node + 2) * (jmax + 2), MPI_FLOAT, NULL,NULL,NULL,NULL,0, MPI_COMM_WORLD);
+        MPI_Gatherv(&p[0][0], (imax_node + 2) * (jmax + 2), MPI_FLOAT, NULL,NULL,NULL,NULL,0, MPI_COMM_WORLD);
+        MPI_Gatherv(&flag[0][0], (imax_node + 2) * (jmax + 2), MPI_CHAR, NULL,NULL,NULL,NULL,0, MPI_COMM_WORLD);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
